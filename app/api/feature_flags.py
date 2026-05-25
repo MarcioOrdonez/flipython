@@ -6,16 +6,25 @@ from pydantic import BaseModel
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.auth.service import authenticate
 from app.db.session import get_session
 from app.domain.feature_flag import FeatureFlag
 from app.repositories.feature_flags import FeatureFlagRepository
 
-router = APIRouter(prefix="/feature-flags", tags=["feature-flags"])
+router = APIRouter(
+    prefix="/feature-flags",
+    tags=["feature-flags"],
+    dependencies=[Depends(authenticate)],
+)
 
 
 class FeatureFlagCreate(BaseModel):
     key: str
     enabled: bool = True
+
+
+class FeatureFlagByKeyRequest(BaseModel):
+    key: str
 
 
 class FeatureFlagUpdate(BaseModel):
@@ -65,6 +74,20 @@ def list_feature_flags(
     repository: FeatureFlagRepository = Depends(get_repository),
 ) -> List[FeatureFlag]:
     return repository.list()
+
+
+@router.post("/by-key", response_model=FeatureFlagResponse)
+def get_feature_flag_by_key(
+    payload: FeatureFlagByKeyRequest,
+    repository: FeatureFlagRepository = Depends(get_repository),
+) -> FeatureFlag:
+    flag = repository.get_by_key(payload.key)
+    if flag is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Feature flag not found.",
+        )
+    return flag
 
 
 @router.put("/{flag_id}", response_model=FeatureFlagResponse)

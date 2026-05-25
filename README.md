@@ -14,6 +14,7 @@ between so persistence logic stays isolated from the API.
 - List feature flags
 - Update feature flags
 - Delete feature flags
+- Protect feature flag routes with bearer token authentication
 - Store flags in PostgreSQL through SQLAlchemy
 - Manage schema changes with Alembic migrations
 - Run locally with Docker Compose and `uv`
@@ -24,16 +25,35 @@ The service exposes these routes:
 
 ```text
 GET    /health
+POST   /api-keys
 POST   /feature-flags
 GET    /feature-flags
 PUT    /feature-flags/{flag_id}
 DELETE /feature-flags/{flag_id}
 ```
 
+Feature flag routes require an authorization header:
+
+```text
+Authorization: Bearer <token>
+```
+
+The token is hashed with SHA-256 and matched against enabled API keys stored in
+the database.
+
+Create an API key record:
+
+```bash
+curl -X POST http://localhost:8000/api-keys \
+  -H "Content-Type: application/json" \
+  -d '{"name": "service-a", "env": "dev"}'
+```
+
 Example create request:
 
 ```bash
 curl -X POST http://localhost:8000/feature-flags \
+  -H "Authorization: Bearer your-api-token" \
   -H "Content-Type: application/json" \
   -d '{"key": "new-checkout", "enabled": true}'
 ```
@@ -46,6 +66,13 @@ Example response:
   "key": "new-checkout",
   "enabled": true
 }
+```
+
+Example list request:
+
+```bash
+curl http://localhost:8000/feature-flags \
+  -H "Authorization: Bearer your-api-token"
 ```
 
 ## Requirements
